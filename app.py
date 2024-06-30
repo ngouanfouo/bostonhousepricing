@@ -1,0 +1,58 @@
+import pickle
+from flask import Flask, request, jsonify, render_template, url_for
+import numpy as np
+import pandas as pd
+
+# Load the pickled model and scaler (assuming files are in the same directory)
+def load_model_and_scaler():
+    global regmodel, scaler
+    try:
+        with open('regmodel.pkl', 'rb') as f:
+            regmodel = pickle.load(f)
+        print("Model loaded successfully!")
+
+        with open('scaling.pkl', 'rb') as f:
+            scaler = pickle.load(f)
+        print("Scaler loaded successfully!")
+    except FileNotFoundError:
+        print("Model or scaler file not found. Please ensure 'regmodel.pkl' and 'scaling.pkl' exist in the same directory.")
+        raise  # Re-raise the exception to halt execution
+
+# Load model and scaler at application startup
+load_model_and_scaler()
+
+
+app = Flask(__name__)
+
+
+@app.route('/')
+def home():
+    return render_template('home.html')  # Assuming a home.html template exists
+
+
+@app.route('/predict_api', methods=['POST'])
+def predict_api():
+    try:
+        # Get the data from the request
+        data = request.get_json(force=True)  # Ensure proper JSON parsing
+
+        # Convert data to a NumPy array and reshape
+        new_data = np.array(list(data.values())).reshape(1, -1)
+
+        # Make prediction using the loaded model (including potential scaling)
+        output = regmodel.predict(scaler.transform(new_data))
+        return jsonify({'prediction': output[0]})
+
+    except Exception as e:
+        print(f"Error during prediction: {e}")
+        return jsonify({'error': 'An error occurred during prediction'})
+
+@app.route('/predict',methods=['POST'])
+def predict():
+    data=[float(x) for x in request.form.values()]
+    final_input=scaler.transform(np.array(data).reshape(1,-1))
+    print(final_input)
+    regmodel.predict(final_input)[0]
+    return render_template("home.html",prediction_text="The house price prediction is {}".format(output))
+if __name__ == "__main__":
+    app.run(debug=True)
